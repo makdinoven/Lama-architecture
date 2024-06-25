@@ -1,0 +1,47 @@
+name: WordPress Theme Activation and Page Display Test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: wordpress
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=10s --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+          extensions: mbstring, xml, curl, intl, mysql
+          tools: composer, phpunit, wp-cli
+
+      - name: Install WordPress and configure environment
+        run: |
+          wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+          php wp-cli.phar core download --path=wordpress --version=latest
+          mv your-theme wordpress/wp-content/themes/
+          cd wordpress
+          php wp-cli.phar config create --dbname=wordpress --dbuser=root --dbpass=password --dbhost=localhost
+          php wp-cli.phar db create
+          php wp-cli.phar core install --url=localhost --title="Test" --admin_user=admin --admin_password=password --admin_email=test@example.com
+
+      - name: Activate theme
+        run: |
+          cd wordpress
+          php wp-cli.phar theme activate your-theme
+          php wp-cli.phar theme status your-theme
+
+      - name: Check homepage availability
+        run: |
+          curl --fail http://localhost/wordpress/
